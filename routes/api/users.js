@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const gravatar = require('gravatar');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const keys = require('../../config/keys');
+const passport = require('passport');
 //Load user model
 const User = require('../../models/User');
 
@@ -46,6 +49,61 @@ router.post('/register',(req,res)=>{
             })
         }
     })
+
+});
+
+//route GET api/users/login
+//@desc Register user
+//@access Public
+router.post('/login',(req,res)=>{
+    const email = req.body.email;
+    const password = req.body.password;
+
+    //Find User
+    User.findOne({email})
+        .then(user=>{
+            if(!user){
+                return res.status(404).json({email:'User not found'});
+            }
+
+            //check password
+            bcrypt.compare(password,user.password)
+                    .then(isMatch=>{
+                        if(isMatch){
+                            //User Matched
+                            const payload = { id:user.id,name:user.name,avatar:user.avatar}
+
+                            //Sign Token
+                            jwt.sign(
+                                    payload,
+                                    keys.secretOrKey,
+                                    {expiresIn:3600},
+                                    (err,token)=>{
+                                        res.json({
+                                            success: true,
+                                            token: 'Bearer '+token
+                                        });
+
+                                    });
+                            //res.json({msg:'Success'});
+                        }else{
+                            return res.status(404).json({email:'Password Incorrect'});
+                            
+                        }
+                    })
+        })
+})
+
+//route GET api/users/current
+//@desc current user
+//@access Private
+router.get('/current',passport.authenticate('jwt',{'session':false}),(req,res)=>{
+  //  res.json({msg:'success'});
+  res.json({
+      id: req.user.id,
+      name:req.user.name,
+      email:req.user.email,
+  });
 
 });
 
